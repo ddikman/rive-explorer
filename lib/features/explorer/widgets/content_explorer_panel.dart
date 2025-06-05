@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rive/rive.dart';
 import '../../upload/providers/upload_provider.dart';
@@ -586,7 +587,7 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
             _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
+              0.0, // Scroll to top since we reversed the list
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOut,
             );
@@ -653,6 +654,15 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                   padding: const EdgeInsets.all(4),
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.copy_all, size: 16),
+                onPressed: () => _copyAllMessages(context),
+                tooltip: 'Copy All Messages',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(24, 24),
+                  padding: const EdgeInsets.all(4),
+                ),
+              ),
             ],
           ),
         ),
@@ -692,7 +702,10 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                   controller: _scrollController,
                   padding: const EdgeInsets.all(8),
                   itemCount: consoleState.messages.length,
+                  reverse: true, // Show newest messages at top
                   itemBuilder: (context, index) {
+                    // With reverse: true, we want index 0 to show the oldest message at bottom
+                    // and index (length-1) to show the newest message at top
                     final message = consoleState.messages[index];
                     return _buildMessageTile(context, message);
                   },
@@ -732,7 +745,7 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                 color: message.color,
               ),
               const SizedBox(width: 6),
-              Text(
+              SelectableText(
                 message.prefix,
                 style: TextStyle(
                   color: message.color,
@@ -750,7 +763,7 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                     color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
-                  child: Text(
+                  child: SelectableText(
                     message.source!,
                     style: const TextStyle(
                       color: AppColors.onSurfaceVariant,
@@ -761,7 +774,7 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                 ),
               ],
               const Spacer(),
-              Text(
+              SelectableText(
                 timestamp,
                 style: const TextStyle(
                   color: AppColors.onSurfaceVariant,
@@ -769,11 +782,23 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
                   fontFamily: 'monospace',
                 ),
               ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 14),
+                onPressed: () => _copyMessageToClipboard(context, message),
+                tooltip: 'Copy message',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(20, 20),
+                  padding: const EdgeInsets.all(2),
+                  backgroundColor:
+                      AppColors.surfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
           // Message content
-          Text(
+          SelectableText(
             message.message,
             style: TextStyle(
               color: message.type == ConsoleMessageType.error
@@ -799,5 +824,81 @@ class _ConsoleTabState extends ConsumerState<_ConsoleTab> {
     } else {
       return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
     }
+  }
+
+  void _copyMessageToClipboard(
+      BuildContext context, ConsoleMessage message) async {
+    final formattedMessage = _formatMessageForClipboard(message);
+
+    try {
+      await Clipboard.setData(ClipboardData(text: formattedMessage));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message copied to clipboard'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to copy message'),
+            backgroundColor: AppColors.error,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _copyAllMessages(BuildContext context) async {
+    final consoleState = ref.read(consoleProvider);
+
+    if (consoleState.messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No messages to copy'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Format all messages in reverse order (newest first)
+    final reversedMessages = consoleState.messages.reversed.toList();
+    final allMessages = reversedMessages
+        .map((message) => _formatMessageForClipboard(message))
+        .join('\n\n');
+
+    try {
+      await Clipboard.setData(ClipboardData(text: allMessages));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${consoleState.messages.length} messages copied to clipboard'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to copy messages'),
+            backgroundColor: AppColors.error,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatMessageForClipboard(ConsoleMessage message) {
+    final timestamp = message.timestamp.toIso8601String();
+    final source = message.source != null ? '[${message.source}] ' : '';
+    return '[$timestamp] ${message.prefix}: $source${message.message}';
   }
 }
