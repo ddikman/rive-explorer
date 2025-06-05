@@ -52,6 +52,15 @@ class UploadNotifier extends _$UploadNotifier {
           details:
               '${riveFileData.artboards.length} artboards, ${riveFileData.artboards.fold(0, (sum, ab) => sum + ab.animations.length)} animations');
 
+      // Analyze the file for potential issues
+      final totalAnimations = riveFileData.artboards
+          .fold(0, (sum, ab) => sum + ab.animations.length);
+      final totalStateMachines = riveFileData.artboards
+          .fold(0, (sum, ab) => sum + ab.stateMachines.length);
+
+      consoleNotifier.analyzeRiveFile(fileName, riveFileData.artboards.length,
+          totalAnimations, totalStateMachines);
+
       // Set success state
       state = state.copyWith(
         status: UploadStatus.success,

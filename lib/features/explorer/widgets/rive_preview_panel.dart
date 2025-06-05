@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rive/rive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
+import 'dart:async';
 import '../../upload/providers/upload_provider.dart';
 import '../providers/explorer_state_provider.dart';
 import '../providers/console_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/rive_file_data.dart';
 import '../../../core/router/app_router.dart';
+import 'package:flutter/foundation.dart';
 
 class RivePreviewPanel extends ConsumerStatefulWidget {
   const RivePreviewPanel({super.key});
@@ -306,172 +308,208 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
       final key = ValueKey(
           '${explorerState.selectedArtboard?.name ?? 'default'}_${explorerState.selectedStateMachine?.name ?? 'none'}_${explorerState.selectedAnimation?.name ?? 'none'}');
 
-      return RiveAnimation.direct(
-        riveFileData.riveFile,
+      // Wrap RiveAnimation with error handling
+      return _RiveAnimationErrorBoundary(
         key: key,
-        fit: _fit,
-        alignment: _alignment,
-        artboard: explorerState.selectedArtboard?.name,
-        onInit: (artboard) {
-          print('🎬 RivePreviewPanel: onInit called');
+        onError: (error, stackTrace) {
+          final errorString = error.toString();
 
-          // Log artboard initialization
-          ref.read(consoleProvider.notifier).logRiveOperation(
-                'Initializing artboard: ${artboard.name}',
-              );
+          // Check for vector feathering issue
+          if (errorString.contains('RangeError') &&
+              (errorString.contains('index should be less than 2: 2') ||
+                  (errorString.contains('Index out of range') &&
+                      errorString.contains('2')))) {
+            ref.read(consoleProvider.notifier).logRiveOperation(
+                  'Vector Feathering Error Detected',
+                  details:
+                      'This Rive file uses unsupported Feather features. See: https://github.com/rive-app/rive-flutter/issues/461',
+                  isError: true,
+                );
 
-          // Clean up old controllers first
-          _cleanupControllers();
+            ref.read(consoleProvider.notifier).addWarning(
+                  'Solution: Open file in Rive Editor and remove Feather effects or check Fill rules are not set to "Clockwise"',
+                  source: 'Diagnostic',
+                );
 
-          try {
-            // Priority 1: Use selected state machine
-            if (explorerState.selectedStateMachine != null) {
-              print(
-                  '🎬 Creating state machine controller: ${explorerState.selectedStateMachine!.name}');
+            ref.read(consoleProvider.notifier).addInfo(
+                  'Feather features are not yet supported in Flutter. Check: https://rive.app/docs/feature-support#feathers',
+                  source: 'Diagnostic',
+                );
+          } else {
+            ref.read(consoleProvider.notifier).logRiveOperation(
+                  'Rive rendering error',
+                  details: error.toString(),
+                  isError: true,
+                );
+          }
+        },
+        child: RiveAnimation.direct(
+          riveFileData.riveFile,
+          key: key,
+          fit: _fit,
+          alignment: _alignment,
+          artboard: explorerState.selectedArtboard?.name,
+          onInit: (artboard) {
+            print('🎬 RivePreviewPanel: onInit called');
 
-              ref.read(consoleProvider.notifier).logControllerOperation(
-                    'Creating controller',
-                    'StateMachine',
-                    details: explorerState.selectedStateMachine!.name,
-                  );
+            // Log artboard initialization
+            ref.read(consoleProvider.notifier).logRiveOperation(
+                  'Initializing artboard: ${artboard.name}',
+                );
 
-              final controller = StateMachineController.fromArtboard(
-                  artboard, explorerState.selectedStateMachine!.name);
+            // Clean up old controllers first
+            _cleanupControllers();
 
-              if (controller != null) {
-                _stateMachineController = controller;
-                artboard.addController(_stateMachineController!);
-                _currentStateMachineName =
-                    explorerState.selectedStateMachine!.name;
+            try {
+              // Priority 1: Use selected state machine
+              if (explorerState.selectedStateMachine != null) {
+                print(
+                    '🎬 Creating state machine controller: ${explorerState.selectedStateMachine!.name}');
+
+                ref.read(consoleProvider.notifier).logControllerOperation(
+                      'Creating controller',
+                      'StateMachine',
+                      details: explorerState.selectedStateMachine!.name,
+                    );
+
+                final controller = StateMachineController.fromArtboard(
+                    artboard, explorerState.selectedStateMachine!.name);
+
+                if (controller != null) {
+                  _stateMachineController = controller;
+                  artboard.addController(_stateMachineController!);
+                  _currentStateMachineName =
+                      explorerState.selectedStateMachine!.name;
+                  _currentArtboardName = explorerState.selectedArtboard?.name;
+
+                  ref.read(consoleProvider.notifier).logControllerOperation(
+                        'Successfully created and attached controller',
+                        'StateMachine',
+                        details: '${controller.inputs.length} inputs available',
+                      );
+
+                  // Update the explorer state with this controller
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref
+                        .read(explorerStateProvider.notifier)
+                        .updateStateMachineController(_stateMachineController);
+                  });
+
+                  setState(() {
+                    _isPlaying = true; // State machines typically auto-play
+                  });
+                  return;
+                } else {
+                  ref.read(consoleProvider.notifier).logControllerOperation(
+                        'Failed to create controller',
+                        'StateMachine',
+                        details: explorerState.selectedStateMachine!.name,
+                        isError: true,
+                      );
+                }
+              }
+
+              // Priority 2: Use selected animation
+              if (explorerState.selectedAnimation != null) {
+                print(
+                    '🎬 Creating animation controller: ${explorerState.selectedAnimation!.name}');
+
+                ref.read(consoleProvider.notifier).logControllerOperation(
+                      'Creating controller',
+                      'Animation',
+                      details: explorerState.selectedAnimation!.name,
+                    );
+
+                _controller = SimpleAnimation(
+                  explorerState.selectedAnimation!.name,
+                  autoplay: false, // We'll control play/pause manually
+                );
+                artboard.addController(_controller!);
+                _currentAnimationName = explorerState.selectedAnimation!.name;
                 _currentArtboardName = explorerState.selectedArtboard?.name;
 
                 ref.read(consoleProvider.notifier).logControllerOperation(
-                      'Successfully created and attached controller',
-                      'StateMachine',
-                      details: '${controller.inputs.length} inputs available',
+                      'Successfully created animation controller',
+                      'Animation',
+                      details:
+                          '${explorerState.selectedAnimation!.duration.toStringAsFixed(1)}s duration',
                     );
 
                 // Update the explorer state with this controller
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   ref
                       .read(explorerStateProvider.notifier)
-                      .updateStateMachineController(_stateMachineController);
+                      .updateAnimationController(_controller);
                 });
 
                 setState(() {
-                  _isPlaying = true; // State machines typically auto-play
+                  _isPlaying = false; // Start paused for manual control
                 });
                 return;
-              } else {
-                ref.read(consoleProvider.notifier).logControllerOperation(
-                      'Failed to create controller',
-                      'StateMachine',
-                      details: explorerState.selectedStateMachine!.name,
-                      isError: true,
-                    );
               }
-            }
 
-            // Priority 2: Use selected animation
-            if (explorerState.selectedAnimation != null) {
-              print(
-                  '🎬 Creating animation controller: ${explorerState.selectedAnimation!.name}');
-
-              ref.read(consoleProvider.notifier).logControllerOperation(
-                    'Creating controller',
-                    'Animation',
-                    details: explorerState.selectedAnimation!.name,
-                  );
-
-              _controller = SimpleAnimation(
-                explorerState.selectedAnimation!.name,
-                autoplay: false, // We'll control play/pause manually
-              );
-              artboard.addController(_controller!);
-              _currentAnimationName = explorerState.selectedAnimation!.name;
-              _currentArtboardName = explorerState.selectedArtboard?.name;
-
-              ref.read(consoleProvider.notifier).logControllerOperation(
-                    'Successfully created animation controller',
-                    'Animation',
-                    details:
-                        '${explorerState.selectedAnimation!.duration.toStringAsFixed(1)}s duration',
-                  );
-
-              // Update the explorer state with this controller
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                ref
-                    .read(explorerStateProvider.notifier)
-                    .updateAnimationController(_controller);
-              });
-
-              setState(() {
-                _isPlaying = false; // Start paused for manual control
-              });
-              return;
-            }
-
-            // Priority 3: Fall back to first animation in selected artboard
-            if (explorerState.selectedArtboard != null &&
-                explorerState.selectedArtboard!.animations.isNotEmpty) {
-              final anim = explorerState.selectedArtboard!.animations.first;
-              print('🎬 Fallback to first animation: ${anim.name}');
-
-              ref.read(consoleProvider.notifier).logControllerOperation(
-                    'Using fallback animation',
-                    'Animation',
-                    details: anim.name,
-                  );
-
-              _controller = SimpleAnimation(anim.name, autoplay: false);
-              artboard.addController(_controller!);
-              _currentAnimationName = anim.name;
-              _currentArtboardName = explorerState.selectedArtboard!.name;
-
-              setState(() {
-                _isPlaying = false;
-              });
-              return;
-            }
-
-            // Priority 4: Ultimate fallback - first artboard's first animation
-            if (riveFileData.artboards.isNotEmpty) {
-              final firstArtboard = riveFileData.artboards.first;
-              if (firstArtboard.animations.isNotEmpty) {
-                final anim = firstArtboard.animations.first;
-                print('🎬 Ultimate fallback: ${anim.name}');
+              // Priority 3: Fall back to first animation in selected artboard
+              if (explorerState.selectedArtboard != null &&
+                  explorerState.selectedArtboard!.animations.isNotEmpty) {
+                final anim = explorerState.selectedArtboard!.animations.first;
+                print('🎬 Fallback to first animation: ${anim.name}');
 
                 ref.read(consoleProvider.notifier).logControllerOperation(
-                      'Using ultimate fallback animation',
+                      'Using fallback animation',
                       'Animation',
-                      details: '${anim.name} from ${firstArtboard.name}',
+                      details: anim.name,
                     );
 
                 _controller = SimpleAnimation(anim.name, autoplay: false);
                 artboard.addController(_controller!);
                 _currentAnimationName = anim.name;
-                _currentArtboardName = firstArtboard.name;
+                _currentArtboardName = explorerState.selectedArtboard!.name;
 
                 setState(() {
                   _isPlaying = false;
                 });
-              } else {
-                ref.read(consoleProvider.notifier).logRiveOperation(
-                      'No animations found in artboard',
-                      details: firstArtboard.name,
-                      isError: true,
-                    );
+                return;
               }
+
+              // Priority 4: Ultimate fallback - first artboard's first animation
+              if (riveFileData.artboards.isNotEmpty) {
+                final firstArtboard = riveFileData.artboards.first;
+                if (firstArtboard.animations.isNotEmpty) {
+                  final anim = firstArtboard.animations.first;
+                  print('🎬 Ultimate fallback: ${anim.name}');
+
+                  ref.read(consoleProvider.notifier).logControllerOperation(
+                        'Using ultimate fallback animation',
+                        'Animation',
+                        details: '${anim.name} from ${firstArtboard.name}',
+                      );
+
+                  _controller = SimpleAnimation(anim.name, autoplay: false);
+                  artboard.addController(_controller!);
+                  _currentAnimationName = anim.name;
+                  _currentArtboardName = firstArtboard.name;
+
+                  setState(() {
+                    _isPlaying = false;
+                  });
+                } else {
+                  ref.read(consoleProvider.notifier).logRiveOperation(
+                        'No animations found in artboard',
+                        details: firstArtboard.name,
+                        isError: true,
+                      );
+                }
+              }
+            } catch (e) {
+              print('🎬 RivePreviewPanel: Error initializing controller: $e');
+              ref.read(consoleProvider.notifier).logRiveOperation(
+                    'Error initializing Rive controller',
+                    details: e.toString(),
+                    isError: true,
+                  );
             }
-          } catch (e) {
-            print('🎬 RivePreviewPanel: Error initializing controller: $e');
-            ref.read(consoleProvider.notifier).logRiveOperation(
-                  'Error initializing Rive controller',
-                  details: e.toString(),
-                  isError: true,
-                );
-          }
-        },
+          },
+        ),
       );
     } catch (e) {
       print('🎬 RivePreviewPanel: Exception in _buildRivePreview: $e');
@@ -908,6 +946,359 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
           fit: _fit,
           alignment: _alignment,
         ),
+      ),
+    );
+  }
+}
+
+class _RiveAnimationErrorBoundary extends StatefulWidget {
+  final Widget child;
+  final Function(Object error, StackTrace stackTrace)? onError;
+
+  const _RiveAnimationErrorBoundary({
+    super.key,
+    required this.child,
+    this.onError,
+  });
+
+  @override
+  State<_RiveAnimationErrorBoundary> createState() =>
+      _RiveAnimationErrorBoundaryState();
+}
+
+class _RiveAnimationErrorBoundaryState
+    extends State<_RiveAnimationErrorBoundary> {
+  Object? _error;
+  StackTrace? _stackTrace;
+  bool _hasError = false;
+  FlutterErrorDetails? _errorDetails;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Store the original error handler
+    final originalOnError = FlutterError.onError;
+
+    // Override Flutter's error handler to catch rendering errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      // Check if this error is related to RiveAnimation and happened in our context
+      final errorString = details.toString();
+      if (mounted &&
+          (errorString.contains('RiveAnimation') ||
+              errorString.contains('RangeError') ||
+              errorString.contains('IndexError') ||
+              errorString.contains('rive_common') ||
+              (errorString.contains('paint') &&
+                  errorString.contains('index')))) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _error = details.exception;
+              _stackTrace = details.stack;
+              _errorDetails = details;
+              _hasError = true;
+            });
+            widget.onError
+                ?.call(details.exception, details.stack ?? StackTrace.current);
+          }
+        });
+      }
+
+      // Call the original error handler
+      originalOnError?.call(details);
+    };
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError && _error != null) {
+      return _buildErrorWidget();
+    }
+
+    try {
+      return widget.child;
+    } catch (error, stackTrace) {
+      // Catch any synchronous errors
+      setState(() {
+        _error = error;
+        _stackTrace = stackTrace;
+        _hasError = true;
+      });
+      widget.onError?.call(error, stackTrace);
+      return _buildErrorWidget();
+    }
+  }
+
+  Widget _buildErrorWidget() {
+    final isFeatheringError = _isVectorFeatheringError();
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isFeatheringError ? Icons.warning : Icons.error_outline,
+              size: 48,
+              color: isFeatheringError ? AppColors.warning : AppColors.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isFeatheringError
+                  ? 'Unsupported Feature'
+                  : 'Rive Rendering Error',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color:
+                        isFeatheringError ? AppColors.warning : AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (isFeatheringError ? AppColors.warning : AppColors.error)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color:
+                      (isFeatheringError ? AppColors.warning : AppColors.error)
+                          .withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                _getErrorMessage(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: isFeatheringError
+                          ? AppColors.warning
+                          : AppColors.error,
+                      fontFamily: 'monospace',
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            if (isFeatheringError) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.lightbulb_outline,
+                            size: 16, color: AppColors.info),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Solution:',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.info,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '• Open the Rive file in Rive Editor\n• Check all shapes for Feather effects\n• Verify no Fill rule is set to "Clockwise"\n• Remove or disable Feather features',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.info,
+                            height: 1.4,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _error = null;
+                      _stackTrace = null;
+                      _hasError = false;
+                      _errorDetails = null;
+                    });
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // Show error details in a dialog
+                    _showErrorDialog(context);
+                  },
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('Details'),
+                ),
+                if (isFeatheringError) ...[
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _showFeatheringHelpDialog(context);
+                    },
+                    icon: const Icon(Icons.help_outline),
+                    label: const Text('Help'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getErrorMessage() {
+    final errorString = _error?.toString() ?? 'Unknown rendering error';
+
+    // Check for specific vector feathering issue
+    if (errorString.contains('RangeError') &&
+        (errorString.contains('index should be less than 2: 2') ||
+            errorString.contains('Index out of range') &&
+                errorString.contains('2'))) {
+      return 'Vector Feathering Issue - This Rive file uses Feather features that are not supported in Flutter.';
+    }
+
+    // Provide more user-friendly error messages for common issues
+    if (errorString.contains('RangeError') ||
+        errorString.contains('IndexError')) {
+      return 'Index out of range - The Rive file contains references to non-existent elements.';
+    } else if (errorString.contains('StateError')) {
+      return 'Animation state error - The state machine may be corrupted.';
+    } else if (errorString.contains('Null check operator')) {
+      return 'Missing data - Required components are missing from the Rive file.';
+    } else if (errorString.contains('LateInitializationError')) {
+      return 'Initialization error - Rive components not properly set up.';
+    } else {
+      // Return a truncated version of the error
+      return errorString.length > 150
+          ? '${errorString.substring(0, 150)}...'
+          : errorString;
+    }
+  }
+
+  bool _isVectorFeatheringError() {
+    final errorString = _error?.toString() ?? '';
+    return errorString.contains('RangeError') &&
+        (errorString.contains('index should be less than 2: 2') ||
+            (errorString.contains('Index out of range') &&
+                errorString.contains('2')));
+  }
+
+  void _showErrorDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Error:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(
+                _error?.toString() ?? 'Unknown error',
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+              if (_stackTrace != null) ...[
+                const SizedBox(height: 12),
+                const Text('Stack Trace:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  _stackTrace!.toString(),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 10),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFeatheringHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Feathering Help'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'To resolve Feathering issues, follow these steps:',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '1. Open the Rive file in Rive Editor',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      height: 1.4,
+                    ),
+              ),
+              Text(
+                '2. Check all shapes for Feather effects',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      height: 1.4,
+                    ),
+              ),
+              Text(
+                '3. Verify no Fill rule is set to "Clockwise"',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      height: 1.4,
+                    ),
+              ),
+              Text(
+                '4. Remove or disable Feather features',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      height: 1.4,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

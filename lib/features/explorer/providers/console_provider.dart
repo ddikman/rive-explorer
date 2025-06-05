@@ -149,6 +149,52 @@ class ConsoleNotifier extends StateNotifier<ConsoleState> {
       addDebug(message, source: 'Controller');
     }
   }
+
+  // Helper method to analyze Rive file for potential issues
+  void analyzeRiveFile(String fileName, int artboardCount, int animationCount,
+      int stateMachineCount) {
+    addInfo('File analysis started: $fileName', source: 'Diagnostic');
+
+    if (artboardCount == 0) {
+      addWarning('No artboards found - file may be corrupted',
+          source: 'Diagnostic');
+    }
+
+    if (animationCount == 0 && stateMachineCount == 0) {
+      addWarning('No animations or state machines found - file may be empty',
+          source: 'Diagnostic');
+    }
+
+    addInfo(
+        'Analysis complete: $artboardCount artboards, $animationCount animations, $stateMachineCount state machines',
+        source: 'Diagnostic');
+  }
+
+  // Helper method to suggest solutions for common errors
+  void suggestSolution(String errorType) {
+    switch (errorType.toLowerCase()) {
+      case 'feathering':
+      case 'vector_feathering':
+        addInfo(
+            'Feathering Issue: Remove Feather effects from shapes in Rive Editor',
+            source: 'Solution');
+        addInfo(
+            'Check: https://rive.app/docs/feature-support#feathers for feature support',
+            source: 'Solution');
+        break;
+      case 'range_error':
+      case 'index_error':
+        addInfo(
+            'Index Error: Check for corrupted data or invalid references in the Rive file',
+            source: 'Solution');
+        break;
+      case 'state_machine':
+        addInfo(
+            'State Machine Error: Verify all inputs and transitions are properly configured',
+            source: 'Solution');
+        break;
+    }
+  }
 }
 
 final consoleProvider = StateNotifierProvider<ConsoleNotifier, ConsoleState>(
