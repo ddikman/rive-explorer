@@ -1,0 +1,17 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# General dart development rules
+
+- Use fvm (flutter version manager) instead of dart and flutter commands direcly
+- Place non-view logic files in service, utility or view controller classes
+- Add unit tests for view controller class
+- Run lint and test after completions
+- Add widget tests for UI functionality
+
+
+## Testing instructions
+
+Running `fvm flutter run -d chrome` means the browser will open but since it can't be automatically interacted with, do not run this. Instead, finish by running a lint, test and build but not debug. If debugging is needed, I will be having a debug session open and I can manually verify any changes needed.
