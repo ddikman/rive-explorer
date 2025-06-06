@@ -1,16 +1,17 @@
+import 'dart:async';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rive/rive.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
-import 'dart:async';
-import '../../upload/providers/upload_provider.dart';
-import '../providers/explorer_state_provider.dart';
-import '../providers/console_provider.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../models/rive_file_data.dart';
-import '../../../core/router/app_router.dart';
-import 'package:flutter/foundation.dart';
+import '../../upload/providers/upload_provider.dart';
+import '../providers/console_provider.dart';
+import '../providers/explorer_state_provider.dart';
 
 class RivePreviewPanel extends ConsumerStatefulWidget {
   const RivePreviewPanel({super.key});
@@ -109,16 +110,14 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                   if (explorerState.selectedStateMachine != null) ...[
                     Chip(
                       label: Text(explorerState.selectedStateMachine!.name),
-                      backgroundColor:
-                          AppColors.secondary.withValues(alpha: 0.1),
+                      backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
                     ),
                     const SizedBox(width: 8),
                   ],
                   if (explorerState.selectedAnimation != null) ...[
                     Chip(
                       label: Text(explorerState.selectedAnimation!.name),
-                      backgroundColor:
-                          AppColors.secondary.withValues(alpha: 0.1),
+                      backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -134,8 +133,10 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     onPressed: riveFileData != null ? _stopAnimation : null,
                     tooltip: 'Stop',
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.surface,
-                      foregroundColor: AppColors.error,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 2),
+                      shape: const CircleBorder(),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -144,8 +145,10 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     onPressed: riveFileData != null ? _togglePlayback : null,
                     tooltip: _isPlaying ? 'Pause' : 'Play',
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: _isPlaying ? AppColors.success : Colors.transparent,
+                      foregroundColor: _isPlaying ? Colors.white : Colors.white,
+                      side: _isPlaying ? null : const BorderSide(color: Colors.white, width: 2),
+                      shape: const CircleBorder(),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -154,8 +157,10 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     onPressed: riveFileData != null ? _restartAnimation : null,
                     tooltip: 'Restart',
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.surface,
-                      foregroundColor: AppColors.secondary,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 2),
+                      shape: const CircleBorder(),
                     ),
                   ),
                   const Spacer(),
@@ -187,9 +192,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: riveFileData != null
-                  ? _buildRivePreview(riveFileData, explorerState)
-                  : _buildEmptyPreview(),
+              child: riveFileData != null ? _buildRivePreview(riveFileData, explorerState) : _buildEmptyPreview(),
             ),
           ),
         ),
@@ -225,25 +228,20 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     const Spacer(),
                     // Status indicator moved to header for better visibility
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: _isPlaying
                             ? AppColors.primary.withValues(alpha: 0.1)
                             : AppColors.surfaceVariant.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: _isPlaying
-                              ? AppColors.primary.withValues(alpha: 0.3)
-                              : AppColors.border,
+                          color: _isPlaying ? AppColors.primary.withValues(alpha: 0.3) : AppColors.border,
                         ),
                       ),
                       child: Text(
                         _isPlaying ? 'Playing' : 'Paused',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: _isPlaying
-                                  ? AppColors.primary
-                                  : AppColors.onSurfaceVariant,
+                              color: _isPlaying ? AppColors.primary : AppColors.onSurfaceVariant,
                               fontWeight: FontWeight.w500,
                             ),
                       ),
@@ -258,17 +256,12 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     value: _fit,
                     isDense: true,
                     items: const [
-                      DropdownMenuItem(
-                          value: BoxFit.contain, child: Text('Contain')),
-                      DropdownMenuItem(
-                          value: BoxFit.cover, child: Text('Cover')),
+                      DropdownMenuItem(value: BoxFit.contain, child: Text('Contain')),
+                      DropdownMenuItem(value: BoxFit.cover, child: Text('Cover')),
                       DropdownMenuItem(value: BoxFit.fill, child: Text('Fill')),
-                      DropdownMenuItem(
-                          value: BoxFit.fitWidth, child: Text('Fit Width')),
-                      DropdownMenuItem(
-                          value: BoxFit.fitHeight, child: Text('Fit Height')),
-                      DropdownMenuItem(
-                          value: BoxFit.scaleDown, child: Text('Scale Down')),
+                      DropdownMenuItem(value: BoxFit.fitWidth, child: Text('Fit Width')),
+                      DropdownMenuItem(value: BoxFit.fitHeight, child: Text('Fit Height')),
+                      DropdownMenuItem(value: BoxFit.scaleDown, child: Text('Scale Down')),
                       DropdownMenuItem(value: BoxFit.none, child: Text('None')),
                     ],
                     onChanged: (value) {
@@ -294,8 +287,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
     );
   }
 
-  Widget _buildRivePreview(
-      RiveFileData riveFileData, ExplorerStateData explorerState) {
+  Widget _buildRivePreview(RiveFileData riveFileData, ExplorerStateData explorerState) {
     try {
       // Log the preview operation
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -317,8 +309,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
           // Check for vector feathering issue
           if (errorString.contains('RangeError') &&
               (errorString.contains('index should be less than 2: 2') ||
-                  (errorString.contains('Index out of range') &&
-                      errorString.contains('2')))) {
+                  (errorString.contains('Index out of range') && errorString.contains('2')))) {
             ref.read(consoleProvider.notifier).logRiveOperation(
                   'Vector Feathering Error Detected',
                   details:
@@ -363,8 +354,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
             try {
               // Priority 1: Use selected state machine
               if (explorerState.selectedStateMachine != null) {
-                print(
-                    '🎬 Creating state machine controller: ${explorerState.selectedStateMachine!.name}');
+                print('🎬 Creating state machine controller: ${explorerState.selectedStateMachine!.name}');
 
                 ref.read(consoleProvider.notifier).logControllerOperation(
                       'Creating controller',
@@ -372,14 +362,13 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                       details: explorerState.selectedStateMachine!.name,
                     );
 
-                final controller = StateMachineController.fromArtboard(
-                    artboard, explorerState.selectedStateMachine!.name);
+                final controller =
+                    StateMachineController.fromArtboard(artboard, explorerState.selectedStateMachine!.name);
 
                 if (controller != null) {
                   _stateMachineController = controller;
                   artboard.addController(_stateMachineController!);
-                  _currentStateMachineName =
-                      explorerState.selectedStateMachine!.name;
+                  _currentStateMachineName = explorerState.selectedStateMachine!.name;
                   _currentArtboardName = explorerState.selectedArtboard?.name;
 
                   ref.read(consoleProvider.notifier).logControllerOperation(
@@ -390,9 +379,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
 
                   // Update the explorer state with this controller
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    ref
-                        .read(explorerStateProvider.notifier)
-                        .updateStateMachineController(_stateMachineController);
+                    ref.read(explorerStateProvider.notifier).updateStateMachineController(_stateMachineController);
                   });
 
                   setState(() {
@@ -411,8 +398,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
 
               // Priority 2: Use selected animation
               if (explorerState.selectedAnimation != null) {
-                print(
-                    '🎬 Creating animation controller: ${explorerState.selectedAnimation!.name}');
+                print('🎬 Creating animation controller: ${explorerState.selectedAnimation!.name}');
 
                 ref.read(consoleProvider.notifier).logControllerOperation(
                       'Creating controller',
@@ -431,15 +417,12 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                 ref.read(consoleProvider.notifier).logControllerOperation(
                       'Successfully created animation controller',
                       'Animation',
-                      details:
-                          '${explorerState.selectedAnimation!.duration.toStringAsFixed(1)}s duration',
+                      details: '${explorerState.selectedAnimation!.duration.toStringAsFixed(1)}s duration',
                     );
 
                 // Update the explorer state with this controller
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  ref
-                      .read(explorerStateProvider.notifier)
-                      .updateAnimationController(_controller);
+                  ref.read(explorerStateProvider.notifier).updateAnimationController(_controller);
                 });
 
                 setState(() {
@@ -449,8 +432,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
               }
 
               // Priority 3: Fall back to first animation in selected artboard
-              if (explorerState.selectedArtboard != null &&
-                  explorerState.selectedArtboard!.animations.isNotEmpty) {
+              if (explorerState.selectedArtboard != null && explorerState.selectedArtboard!.animations.isNotEmpty) {
                 final anim = explorerState.selectedArtboard!.animations.first;
                 print('🎬 Fallback to first animation: ${anim.name}');
 
@@ -552,8 +534,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
     final uploadState = ref.watch(uploadNotifierProvider);
 
     // Show upload progress if uploading
-    if (uploadState.status == UploadStatus.uploading ||
-        uploadState.status == UploadStatus.processing) {
+    if (uploadState.status == UploadStatus.uploading || uploadState.status == UploadStatus.processing) {
       return _buildUploadProgress(uploadState);
     }
 
@@ -608,8 +589,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                 ),
                 const SizedBox(height: 20),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(20),
@@ -625,19 +605,17 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                       ),
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '.riv',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'monospace',
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'monospace',
+                              ),
                         ),
                       ),
                     ],
@@ -656,22 +634,19 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
                             uploadState.errorMessage ?? 'Upload failed',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColors.error,
-                                    ),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.error,
+                                ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -688,9 +663,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
   }
 
   Widget _buildUploadProgress(UploadState uploadState) {
-    final statusText = uploadState.status == UploadStatus.uploading
-        ? 'Uploading...'
-        : 'Processing Rive file...';
+    final statusText = uploadState.status == UploadStatus.uploading ? 'Uploading...' : 'Processing Rive file...';
 
     return Container(
       width: double.infinity,
@@ -785,8 +758,7 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
     }
   }
 
-  Future<void> _handleFile(
-      String fileName, String filePath, Uint8List fileBytes) async {
+  Future<void> _handleFile(String fileName, String filePath, Uint8List fileBytes) async {
     try {
       final uploadNotifier = ref.read(uploadNotifierProvider.notifier);
 
@@ -911,23 +883,123 @@ class _RivePreviewPanelState extends ConsumerState<RivePreviewPanel> {
 
   void _restartAnimation() {
     ref.read(consoleProvider.notifier).logControllerOperation(
-          'Restarted animation',
+          'Restarting animation/state machine',
           _stateMachineController != null ? 'StateMachine' : 'Animation',
         );
 
-    if (_controller != null && _controller is SimpleAnimation) {
-      final simpleAnim = _controller as SimpleAnimation;
-      simpleAnim.reset();
-      simpleAnim.isActive = true;
-      setState(() {
-        _isPlaying = true;
+    final uploadState = ref.read(uploadNotifierProvider);
+    final explorerState = ref.read(explorerStateProvider);
+    final riveFileData = uploadState.riveFileData;
+
+    if (riveFileData == null) return;
+
+    try {
+      // Clean up current controllers
+      _cleanupControllers();
+
+      // Get the current artboard
+      final artboardName = explorerState.selectedArtboard?.name ??
+          (riveFileData.artboards.isNotEmpty ? riveFileData.artboards.first.name : null);
+
+      if (artboardName == null) return;
+
+      final artboard = riveFileData.riveFile.artboardByName(artboardName);
+      if (artboard == null) return;
+
+      // Recreate and restart the appropriate controller
+      if (explorerState.selectedStateMachine != null) {
+        // Restart state machine
+        final controller = StateMachineController.fromArtboard(artboard, explorerState.selectedStateMachine!.name);
+
+        if (controller != null) {
+          _stateMachineController = controller;
+          artboard.addController(_stateMachineController!);
+          _currentStateMachineName = explorerState.selectedStateMachine!.name;
+          _currentArtboardName = artboardName;
+
+          // Reset all inputs to their default values
+          for (final input in controller.inputs) {
+            if (input is SMIBool && explorerState.selectedStateMachine!.inputs.any((i) => i.name == input.name)) {
+              final inputData = explorerState.selectedStateMachine!.inputs.firstWhere((i) => i.name == input.name);
+              if (inputData.defaultValue is bool) {
+                input.value = inputData.defaultValue as bool;
+              }
+            } else if (input is SMINumber &&
+                explorerState.selectedStateMachine!.inputs.any((i) => i.name == input.name)) {
+              final inputData = explorerState.selectedStateMachine!.inputs.firstWhere((i) => i.name == input.name);
+              if (inputData.defaultValue is num) {
+                input.value = (inputData.defaultValue as num).toDouble();
+              }
+            }
+          }
+
+          _stateMachineController!.isActive = true;
+
+          ref.read(consoleProvider.notifier).logControllerOperation(
+                'State machine restarted successfully',
+                'StateMachine',
+                details: '${controller.inputs.length} inputs reset to defaults',
+              );
+
+          setState(() {
+            _isPlaying = true;
+          });
+        }
+      } else if (explorerState.selectedAnimation != null) {
+        // Restart animation
+        _controller = SimpleAnimation(
+          explorerState.selectedAnimation!.name,
+          autoplay: true, // Start playing immediately
+        );
+        artboard.addController(_controller!);
+        _currentAnimationName = explorerState.selectedAnimation!.name;
+        _currentArtboardName = artboardName;
+
+        ref.read(consoleProvider.notifier).logControllerOperation(
+              'Animation restarted successfully',
+              'Animation',
+              details: explorerState.selectedAnimation!.name,
+            );
+
+        setState(() {
+          _isPlaying = true;
+        });
+      } else {
+        // Fallback: restart first available animation
+        if (explorerState.selectedArtboard != null && explorerState.selectedArtboard!.animations.isNotEmpty) {
+          final anim = explorerState.selectedArtboard!.animations.first;
+          _controller = SimpleAnimation(anim.name, autoplay: true);
+          artboard.addController(_controller!);
+          _currentAnimationName = anim.name;
+          _currentArtboardName = artboardName;
+
+          ref.read(consoleProvider.notifier).logControllerOperation(
+                'Fallback animation restarted',
+                'Animation',
+                details: anim.name,
+              );
+
+          setState(() {
+            _isPlaying = true;
+          });
+        }
+      }
+
+      // Update the explorer state with the new controllers
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_stateMachineController != null) {
+          ref.read(explorerStateProvider.notifier).updateStateMachineController(_stateMachineController);
+        } else if (_controller != null) {
+          ref.read(explorerStateProvider.notifier).updateAnimationController(_controller);
+        }
       });
-    } else if (_stateMachineController != null) {
-      // For state machines, just restart playback
-      _stateMachineController!.isActive = true;
-      setState(() {
-        _isPlaying = true;
-      });
+    } catch (e) {
+      ref.read(consoleProvider.notifier).logControllerOperation(
+            'Failed to restart',
+            _stateMachineController != null ? 'StateMachine' : 'Animation',
+            details: e.toString(),
+            isError: true,
+          );
     }
   }
 
@@ -962,12 +1034,10 @@ class _RiveAnimationErrorBoundary extends StatefulWidget {
   });
 
   @override
-  State<_RiveAnimationErrorBoundary> createState() =>
-      _RiveAnimationErrorBoundaryState();
+  State<_RiveAnimationErrorBoundary> createState() => _RiveAnimationErrorBoundaryState();
 }
 
-class _RiveAnimationErrorBoundaryState
-    extends State<_RiveAnimationErrorBoundary> {
+class _RiveAnimationErrorBoundaryState extends State<_RiveAnimationErrorBoundary> {
   Object? _error;
   StackTrace? _stackTrace;
   bool _hasError = false;
@@ -989,8 +1059,7 @@ class _RiveAnimationErrorBoundaryState
               errorString.contains('RangeError') ||
               errorString.contains('IndexError') ||
               errorString.contains('rive_common') ||
-              (errorString.contains('paint') &&
-                  errorString.contains('index')))) {
+              (errorString.contains('paint') && errorString.contains('index')))) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
@@ -999,8 +1068,7 @@ class _RiveAnimationErrorBoundaryState
               _errorDetails = details;
               _hasError = true;
             });
-            widget.onError
-                ?.call(details.exception, details.stack ?? StackTrace.current);
+            widget.onError?.call(details.exception, details.stack ?? StackTrace.current);
           }
         });
       }
@@ -1051,12 +1119,9 @@ class _RiveAnimationErrorBoundaryState
             ),
             const SizedBox(height: 16),
             Text(
-              isFeatheringError
-                  ? 'Unsupported Feature'
-                  : 'Rive Rendering Error',
+              isFeatheringError ? 'Unsupported Feature' : 'Rive Rendering Error',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color:
-                        isFeatheringError ? AppColors.warning : AppColors.error,
+                    color: isFeatheringError ? AppColors.warning : AppColors.error,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -1064,21 +1129,16 @@ class _RiveAnimationErrorBoundaryState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: (isFeatheringError ? AppColors.warning : AppColors.error)
-                    .withValues(alpha: 0.1),
+                color: (isFeatheringError ? AppColors.warning : AppColors.error).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color:
-                      (isFeatheringError ? AppColors.warning : AppColors.error)
-                          .withValues(alpha: 0.3),
+                  color: (isFeatheringError ? AppColors.warning : AppColors.error).withValues(alpha: 0.3),
                 ),
               ),
               child: Text(
                 _getErrorMessage(),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isFeatheringError
-                          ? AppColors.warning
-                          : AppColors.error,
+                      color: isFeatheringError ? AppColors.warning : AppColors.error,
                       fontFamily: 'monospace',
                     ),
                 textAlign: TextAlign.center,
@@ -1100,16 +1160,14 @@ class _RiveAnimationErrorBoundaryState
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.lightbulb_outline,
-                            size: 16, color: AppColors.info),
+                        const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.info),
                         const SizedBox(width: 6),
                         Text(
                           'Solution:',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.info,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.info,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ],
                     ),
@@ -1178,14 +1236,12 @@ class _RiveAnimationErrorBoundaryState
     // Check for specific vector feathering issue
     if (errorString.contains('RangeError') &&
         (errorString.contains('index should be less than 2: 2') ||
-            errorString.contains('Index out of range') &&
-                errorString.contains('2'))) {
+            errorString.contains('Index out of range') && errorString.contains('2'))) {
       return 'Vector Feathering Issue - This Rive file uses Feather features that are not supported in Flutter.';
     }
 
     // Provide more user-friendly error messages for common issues
-    if (errorString.contains('RangeError') ||
-        errorString.contains('IndexError')) {
+    if (errorString.contains('RangeError') || errorString.contains('IndexError')) {
       return 'Index out of range - The Rive file contains references to non-existent elements.';
     } else if (errorString.contains('StateError')) {
       return 'Animation state error - The state machine may be corrupted.';
@@ -1195,9 +1251,7 @@ class _RiveAnimationErrorBoundaryState
       return 'Initialization error - Rive components not properly set up.';
     } else {
       // Return a truncated version of the error
-      return errorString.length > 150
-          ? '${errorString.substring(0, 150)}...'
-          : errorString;
+      return errorString.length > 150 ? '${errorString.substring(0, 150)}...' : errorString;
     }
   }
 
@@ -1205,8 +1259,7 @@ class _RiveAnimationErrorBoundaryState
     final errorString = _error?.toString() ?? '';
     return errorString.contains('RangeError') &&
         (errorString.contains('index should be less than 2: 2') ||
-            (errorString.contains('Index out of range') &&
-                errorString.contains('2')));
+            (errorString.contains('Index out of range') && errorString.contains('2')));
   }
 
   void _showErrorDialog(BuildContext context) {
@@ -1219,19 +1272,17 @@ class _RiveAnimationErrorBoundaryState
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Error:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Error:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(
+              SelectableText(
                 _error?.toString() ?? 'Unknown error',
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
               if (_stackTrace != null) ...[
                 const SizedBox(height: 12),
-                const Text('Stack Trace:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Stack Trace:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(
+                SelectableText(
                   _stackTrace!.toString(),
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 10),
                 ),
@@ -1240,6 +1291,39 @@ class _RiveAnimationErrorBoundaryState
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () async {
+              // Copy all error details to clipboard
+              final errorText = '''
+Error: ${_error?.toString() ?? 'Unknown error'}
+
+Stack Trace:
+${_stackTrace?.toString() ?? 'No stack trace available'}
+''';
+              try {
+                await Clipboard.setData(ClipboardData(text: errorText));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Error details copied to clipboard'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to copy error details'),
+                      backgroundColor: AppColors.error,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Copy'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),

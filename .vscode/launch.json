@@ -1,0 +1,72 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (Flutter)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "console": "debugConsole",
+            "deviceId": "chrome"
+        },
+        {
+            "name": "Debug (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "console": "debugConsole"
+        },
+        {
+            "name": "Release (Web)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--release"
+            ],
+            "console": "debugConsole",
+            "deviceId": "chrome"
+        },
+        {
+            "name": "Release (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--release"
+            ],
+            "console": "debugConsole"
+        },
+        {
+            "name": "Profile (Web)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--profile"
+            ],
+            "console": "debugConsole",
+            "deviceId": "chrome"
+        },
+        {
+            "name": "Profile (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--profile"
+            ],
+            "console": "debugConsole"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug All Platforms",
+            "configurations": [
+                "Debug (Flutter)",
+                "Debug (Mobile)"
+            ],
+            "stopAll": true
+        }
+    ]
+}
